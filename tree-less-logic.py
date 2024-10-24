@@ -2,6 +2,7 @@ from itertools import product
 from time import time
 from Queens import *
 
+
 def timer(func):
     # This function shows the execution time of
     # the function object passed
@@ -13,8 +14,6 @@ def timer(func):
         return result
 
     return wrap_func
-
-
 
 
 def to_reverse_polish(formula: str):
@@ -277,18 +276,15 @@ def to_fnc(formula: str, return_rpn=False):
     stack = []
     tokens = rpn.split(" ")
     for token in tokens:
-        print(stack, token)
         match token:
             case ">":
                 right = stack.pop()
                 left = stack.pop()
                 stack.append(f"(-{left}O{right})")
-                print(">", left, right)
             case "Y":
                 right = stack.pop()
                 left = stack.pop()
                 stack.append(f"({left}Y{right})")
-                print("Y", left, right)
             case "O":
                 right = stack.pop()
                 left = stack.pop()
@@ -303,49 +299,38 @@ def to_fnc(formula: str, return_rpn=False):
                     right_subfs = find_subf(right)
                     l2 = right_subfs[0]
                     r2 = right_subfs[1]
-                    
-                    print(left_subfs, right_subfs)
                     stack.append(f"({l}O{l2})Y({l}O{r2})Y({r}O{l2})Y({r}O{r2})")
-                    print("Distributive O")
                 elif left_con == "Y":
                     left = to_reverse_polish(left)
                     left_subfs = find_subf(left)
                     l = left_subfs[0]
                     r = left_subfs[1]
                     stack.append(f"({l}O{right})Y({r}O{right})")
-                    print("Distributive O")
                 elif right_con == "Y":
-                    right  = to_reverse_polish(right)
+                    right = to_reverse_polish(right)
                     right_subfs = find_subf(right)
                     l = right_subfs[0]
                     r = right_subfs[1]
                     stack.append(f"({left}O{l})Y({left}O{r})")
-                    print("Distributive O")
                 else:
                     stack.append(f"({left}O{right})")
-                    print("O", left , right)
-                
             case "-":
                 operand = stack.pop()
                 operand_con = find_conectives(to_reverse_polish(operand))
                 if len(operand) == 1:
                     stack.append(f"-{operand}")
-                    print("Negating literal")
                 elif operand_con == "Y":
                     subfs = find_subf(operand)
                     l = subfs[0]
-                    r = subfs[1]                
+                    r = subfs[1]
                     stack.append(f"(-{l}O-{r})")
-                    print("De Morgan Y")
                 elif operand_con == "O":
                     op_clasf = clasificar_tableaux(operand)
                     if op_clasf == "Alfa" or op_clasf == "Beta":
                         subfs = find_subf(operand)
                         l = subfs[0]
                         r = subfs[1]
-                        print(subfs)
                         stack.append(f"(-{l}Y-{r})")
-                        print("De Morgan O")
                     else:
                         stack.append(f"-{operand}")
                 elif operand_con == ">":
@@ -353,28 +338,126 @@ def to_fnc(formula: str, return_rpn=False):
                     l = subfs[0]
                     r = subfs[1]
                     stack.append(f"({l}Y-{r})")
-                    print("Implication")
                 else:
                     stack.append(f"-{operand}")
-                    print("Negating literal")
             case _:
                 stack.append(token)
-                print("Literal")
     result = stack[0]
     return result if not return_rpn else to_reverse_polish(result)
 
+
+def tseitin_transform(formula: str, return_rpn: bool = False):
+    """
+    Esta fuuncion transforma una formula a su transformacion de Tseitin:
+
+    Proceso:
+    Para cada subformula de la formula se le asigna una variable.
+    Luego se reemplazan las subformulas por las variables asignadas.
+    Se construye una formula que es equivalente a la original a modo que cada variable este <> a la subformula que reemplaza.
+
+    Ejemplo:
+    (A Y B) O C
+
+    Se asignan variables a cada subformula
+
+    A Y B = X1
+    X1 O C = X2
+
+    Se construye la formula equivalente
+    (X1 <> (A Y B)) Y (X2 <> (X1 O C)) Y X2
+    """
+    rpn = to_reverse_polish(formula)
+    letras_chars = [ord(char) for char in letras_proposicionales(formula)]
+    var_min_char = max(letras_chars) + 256
+
+    # La forma en la que se hace es mediante evaulando la formula en notacion polaca inversa
+    # A modo de construir la formula original pero remplazando por lo que en verdad necesitamos
+    stack = []
+    form_stack = (
+        []
+    )  # Necesitamos 2 stacks porque tenemos que trackear las subformulas + las variables, esta va a dar el resultado final
+    tokens = rpn.split(" ")
+    variables_counter = 1
+    for token in tokens:
+        match token:
+            case ">":
+                var = chr(var_min_char + variables_counter)
+                variables_counter += 1
+                if var in "YO>":
+                    var = chr(var_min_char + variables_counter + 1)
+                right = stack.pop()
+                left = stack.pop()
+                stack.append(var)
+                form_stack.append(
+                    f"({left}O{var})Y(-{right}O{var})Y(-{left}O{right}O-{var})"
+                )  # FNC de p <> (q > r)
+            case "Y":
+                var = chr(var_min_char + variables_counter)
+                variables_counter += 1
+                if var in "YO>":
+                    var = chr(var_min_char + variables_counter + 1)
+                right = stack.pop()
+                left = stack.pop()
+                stack.append(var)
+                form_stack.append(
+                    f"({left}O-{var})Y({right}O-{var})Y(-{left}O-{right}O{var})"
+                )  # FNC de p <> (q Y r)
+
+            case "O":
+                var = chr(var_min_char + variables_counter)
+                variables_counter += 1
+                if var in "YO>":
+                    var = chr(var_min_char + variables_counter + 1)
+                right = stack.pop()
+                left = stack.pop()
+                stack.append(var)
+                form_stack.append(
+                    f"((-{left}O{var})Y(-{right}O{var})Y({left}O{right}O-{var}))"
+                )  # FNC de p <> (q O r)
+
+            case "-":
+                var = chr(var_min_char + variables_counter)
+                variables_counter += 1
+                if var in "YO>":
+                    var = chr(var_min_char + variables_counter + 1)
+                operand = stack.pop()
+                stack.append(var)
+                form_stack.append(
+                    f"((-{var}O-{operand})Y({var}O{operand}))"
+                )  # FNC de p <> -q
+
+            case _:
+                stack.append(token)
+    last_var = stack[0]
+    form_stack.append(last_var)
+    return (
+        reduce(lambda x, y: f"{x}Y{y}", form_stack)
+        if not return_rpn
+        else to_reverse_polish(reduce(lambda x, y: f"{x}Y{y}", form_stack))
+    )
+
+
 def main():
-    formula = "(((((((((((((((((((((((((Ā>-(((ąOĊ)Oď)OĔ))Y(ą>-(((ĀOĊ)Oď)OĔ)))Y(Ċ>-(((ĀOą)Oď)OĔ)))Y(ď>-(((ĀOą)OĊ)OĔ)))Y(Ĕ>-(((ĀOą)OĊ)Oď)))Y(ā>-(((ĆOċ)OĐ)Oĕ)))Y(Ć>-(((āOċ)OĐ)Oĕ)))Y(ċ>-(((āOĆ)OĐ)Oĕ)))Y(Đ>-(((āOĆ)Oċ)Oĕ)))Y(ĕ>-(((āOĆ)Oċ)OĐ)))Y(Ă>-(((ćOČ)Ođ)OĖ)))Y(ć>-(((ĂOČ)Ođ)OĖ)))Y(Č>-(((ĂOć)Ođ)OĖ)))Y(đ>-(((ĂOć)OČ)OĖ)))Y(Ė>-(((ĂOć)OČ)Ođ)))Y(ă>-(((ĈOč)OĒ)Oė)))Y(Ĉ>-(((ăOč)OĒ)Oė)))Y(č>-(((ăOĈ)OĒ)Oė)))Y(Ē>-(((ăOĈ)Oč)Oė)))Y(ė>-(((ăOĈ)Oč)OĒ)))Y(Ą>-(((ĉOĎ)Oē)OĘ)))Y(ĉ>-(((ĄOĎ)Oē)OĘ)))Y(Ď>-(((ĄOĉ)Oē)OĘ)))Y(ē>-(((ĄOĉ)OĎ)OĘ)))Y(Ę>-(((ĄOĉ)OĎ)Oē)))"
+    formula = "AYB"
     formula_rpn = to_reverse_polish(formula)
     print(f"Formula:                            {formula}")
     print(f"Formula in Reverse Polish Notation: {formula_rpn}")
+    print(f"Formula back to infix:              {to_infix_notation(formula_rpn)}")
     formula_fnc = to_fnc(formula, return_rpn=False)
     formula_fnc_rpn = to_fnc(formula, return_rpn=True)
     print(f"Formula in FNC:                     {formula_fnc}")
     print(f"Formula in FNC RPN:                 {formula_fnc_rpn}")
-    
-    print(to_fnc("(AYB)O(AY-B)"))
-    super_important_function_that_every_project_needs()
+
+    formula_tseitin = tseitin_transform(formula, return_rpn=False)
+    formula_tseitin_rpn = tseitin_transform(formula, return_rpn=True)
+    formula_tseitin_fnc = to_fnc(formula_tseitin, return_rpn=False)
+    formula_tseitin_fnc_rpn = to_fnc(formula_tseitin, return_rpn=True)
+    print(f"Formula in Tseitin:                 {formula_tseitin}")
+    print(f"Formula in Tseitin RPN:             {formula_tseitin_rpn}")
+    print(f"Formula in Tseitin FNC:             {formula_tseitin_fnc}")
+    print
+    print(f"Formula in Tseitin FNC RPN:         {formula_tseitin_fnc_rpn}")
+
 
 if __name__ == "__main__":
     main()
