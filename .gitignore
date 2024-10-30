@@ -1,1 +1,4 @@
 /__pycache__
+shell.nix
+.iypnv_checkpoints
+.mypy_cache
