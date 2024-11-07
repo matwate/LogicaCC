@@ -1,6 +1,8 @@
 from itertools import product
 from time import time
 from Queens import *
+from functools import reduce
+import random
 
 
 def timer(func):
@@ -437,26 +439,125 @@ def tseitin_transform(formula: str, return_rpn: bool = False):
     )
 
 
-def main():
-    formula = "AYB"
-    formula_rpn = to_reverse_polish(formula)
-    print(f"Formula:                            {formula}")
-    print(f"Formula in Reverse Polish Notation: {formula_rpn}")
-    print(f"Formula back to infix:              {to_infix_notation(formula_rpn)}")
-    formula_fnc = to_fnc(formula, return_rpn=False)
-    formula_fnc_rpn = to_fnc(formula, return_rpn=True)
-    print(f"Formula in FNC:                     {formula_fnc}")
-    print(f"Formula in FNC RPN:                 {formula_fnc_rpn}")
+def separate_by_clauses(formula: str, return_rpn: bool = False):
+    clauses = [
+        clause.replace("(", "").replace(")", "") for clause in formula.split("Y")
+    ]
+    if not return_rpn:
+        return clauses
+    return [to_reverse_polish(clause).replace(" ", "") for clause in clauses]
 
+
+def DPLL(clauses: list, model: dict):
+    # Despite me being the "DO NOT RECURSIVE AAAAAAAA IT WILL KILL YOU" in this case is valid
+    # Because the max depth on the formulas im going to be using it is max 64 or 128 smthn so
+    # It wont eat my whole RAM
+
+    # Unit propagate the whole thing
+    S, I = unit_propagate(clauses, model)
+    if has_empty_clause(S):
+        return "Insatisfacible", {}
+    if len(S) == 0:
+        return "Satisfacible", I
+    all_literals = all_literals_of_clauses(S)
+    the_choice = random.choice(list(all_literals))
+
+    def remove_literal_from_clause_list(clauses: list, literal: str, model: dict):
+        unit_clause = literal
+        if len(unit_clause) == 1:
+            model[unit_clause] = True
+        else:
+            model[unit_clause[1]] = False
+        for clause in clauses:
+            if unit_clause in clause:
+                clauses.remove(clause)
+            if len(unit_clause) == 1:
+                if f"-{unit_clause}" in clause:
+                    clause = clause.replace(f"-{unit_clause}", "")
+            else:
+                if unit_clause[1] in clause:
+                    clause = clause.replace(unit_clause[1], "")
+        return clauses, model
+
+    s_prime, i_prime = remove_literal_from_clause_list(S, the_choice, I)
+    result, model = DPLL(s_prime, i_prime)
+    if result == "Satisfacible":
+        return result, model
+    else:
+        negated_choice = f"-{the_choice}" if not the_choice.startswith("-") else the_choice[1:]
+        s_prime, i_prime = remove_literal_from_clause_list(S, negated_choice, I)
+        result, model = DPLL(s_prime, i_prime)
+        return result, model
+
+
+def all_literals_of_clauses(clauses: list):
+    literals: set[str] = set()
+    for clause in clauses:
+        this_literals = set(clause.split("O"))
+        literals = literals.union(this_literals)
+    return literals
+
+
+def has_empty_clause(clauses: list):
+    return any(clause == "" for clause in clauses)
+
+
+def unit_propagate(clauses: list, model: dict):
+    # Istg clauses should be in infix with parnthesis removed so i can do some quirky bullshit
+    # That way we're going to ASSUME that the clauses are in infix notation with parenthesis so i can do stuff with
+    # string manipulation
+
+    def has_unit_clause(clauses: list):
+        # A unit clause is either "x" or "-x", a non unitary clause will be AT LEAST "Xoy" so if its 2 or 1 long
+        # then its an unit clause
+        return any(len(clause) < 3 and len(clause) >= 1 for clause in clauses)
+
+    def get_unit_clause(clauses: list):
+        for clause in clauses:
+            if len(clause) < 3 and len(clause) >= 1:
+                return clause
+
+    while not has_empty_clause(clauses) and has_unit_clause(clauses):
+        unit_clause = get_unit_clause(clauses)
+        if len(unit_clause) == 1:
+            model[unit_clause] = True
+        else:
+            model[unit_clause[1]] = False
+        for clause in clauses:
+            if unit_clause in clause:
+                clauses.remove(clause)
+            if len(unit_clause) == 1:
+                if f"-{unit_clause}" in clause:
+                    clause = clause.replace(f"-{unit_clause}", "")
+            else:
+                if unit_clause[1] in clause:
+                    clause = clause.replace(unit_clause[1], "")
+    return clauses, model
+
+
+def main():
+    formula = "(AYB)O(CYD)"
     formula_tseitin = tseitin_transform(formula, return_rpn=False)
-    formula_tseitin_rpn = tseitin_transform(formula, return_rpn=True)
-    formula_tseitin_fnc = to_fnc(formula_tseitin, return_rpn=False)
-    formula_tseitin_fnc_rpn = to_fnc(formula_tseitin, return_rpn=True)
-    print(f"Formula in Tseitin:                 {formula_tseitin}")
-    print(f"Formula in Tseitin RPN:             {formula_tseitin_rpn}")
-    print(f"Formula in Tseitin FNC:             {formula_tseitin_fnc}")
-    print
-    print(f"Formula in Tseitin FNC RPN:         {formula_tseitin_fnc_rpn}")
+    print(formula)
+    print()
+    print(formula_tseitin)
+    print(
+        f"Unit Propagated:                   {unit_propagate(separate_by_clauses(formula_tseitin), {})}"
+    )
+    print(
+        f"DPLL:                             {DPLL(separate_by_clauses(formula_tseitin), {})}"
+    )
+    print()
+    print("Trying to DPLL the formula but with it in FNC")
+    formula_fnc = to_fnc(formula, return_rpn=False)
+    print(formula_fnc)
+    print()
+    print(
+        f"Unit Propagated:                   {unit_propagate(separate_by_clauses(formula_fnc), {})}"
+    )
+    print(
+        f"DPLL:                             {DPLL(separate_by_clauses(formula_fnc), {})}"
+    )
 
 
 if __name__ == "__main__":

@@ -2,3 +2,4 @@
 shell.nix
 .iypnv_checkpoints
 .mypy_cache
+/logica-venv
