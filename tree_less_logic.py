@@ -484,7 +484,9 @@ def DPLL(clauses: list, model: dict):
     if result == "Satisfacible":
         return result, model
     else:
-        negated_choice = f"-{the_choice}" if not the_choice.startswith("-") else the_choice[1:]
+        negated_choice = (
+            f"-{the_choice}" if not the_choice.startswith("-") else the_choice[1:]
+        )
         s_prime, i_prime = remove_literal_from_clause_list(S, negated_choice, I)
         result, model = DPLL(s_prime, i_prime)
         return result, model
@@ -533,6 +535,15 @@ def unit_propagate(clauses: list, model: dict):
                 if unit_clause[1] in clause:
                     clause = clause.replace(unit_clause[1], "")
     return clauses, model
+
+
+"""
+    Quick todo list for when i open this again
+    1. DPLL Is not working should:
+        - Remove the O from the clauses
+        - Properly remove negations and shit
+        - Move to separate function the removal part for reusability
+"""
 
 
 def main():
