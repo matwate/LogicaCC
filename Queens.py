@@ -201,11 +201,19 @@ class Reinas:
             image = None
 
         if image:
+            # Filter the letters that are in the range of the chessboard
+            filtered_I = {}
+
             for letter in I:
-                if I[letter]:
+                if (ord(letter) >= self.Reina_En_Casilla.rango[0]) and (ord(letter) <= self.Reina_En_Casilla.rango[1]):
+                    filtered_I[letter] = I[letter]
+
+            # Console print
+            for letter in filtered_I:
+                if filtered_I[letter]:
                     print(self.Reina_En_Casilla.escribir(letter))
 
-            true_pos = [self.Reina_En_Casilla.unravel(letter) for letter in I if I[letter]]
+            true_pos = [self.Reina_En_Casilla.unravel(letter) for letter in filtered_I if filtered_I[letter]]
             n = self.board_size
 
             # Create a checkerboard pattern for the chessboard
