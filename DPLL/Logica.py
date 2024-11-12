@@ -6,11 +6,6 @@ para lógica proposicional
 from itertools import product
 import numpy as np
 from copy import deepcopy
-from typing import List, Dict
-from time import time
-
-CONECTIVOS = ['-', 'Y','O','>','=']
-CONECTIVOS_BINARIOS = ['Y','O','>','=']
 
 class Formula :
 
@@ -32,14 +27,6 @@ class Formula :
             return self.subf.letras()
         elif type(self) == Binario:
             return self.left.letras().union(self.right.letras())
-        
-    def num_conec(self):
-        if type(self) == Letra:
-            return 0
-        elif type(self) == Negacion:
-            return 1 + self.subf.num_conec()
-        elif type(self) == Binario:
-            return 1 + self.left.num_conec() + self.right.num_conec()
 
     def subforms(self):
         if type(self) == Letra:
@@ -48,6 +35,14 @@ class Formula :
             return list(set([str(self)] + self.subf.subforms()))
         elif type(self) == Binario:
             return list(set([str(self)] + self.left.subforms() + self.right.subforms()))
+
+    def num_conec(self):
+        if type(self) == Letra:
+            return 0
+        elif type(self) == Negacion:
+            return 1 + self.subf.num_conec()
+        elif type(self) == Binario:
+            return 1 + self.left.num_conec() + self.right.num_conec()
 
     def valor(self, I) :
         if type(self) == Letra:
@@ -106,7 +101,7 @@ class Formula :
             return estado.interp()
         frontera = [estado]
         while len(frontera) > 0:
-            estado = frontera.pop(-1)
+            estado = frontera.pop(0)
             hijos = estado.expandir()
             for a in hijos:
                 if a != None:
@@ -139,6 +134,146 @@ class Formula :
                     raise("¡Caracter inválido!")
         return ''.join(vis)
 
+    def eliminar_imp(self):
+        if type(self) == Letra:
+            return self
+        elif type(self) == Negacion:
+            return Negacion(self.subf.eliminar_imp())
+        elif type(self) == Binario:
+            if self.conectivo == '>':
+                return Binario('O',
+                               Negacion(self.left.eliminar_imp()),
+                               self.right.eliminar_imp()
+                              )
+            else:
+                return Binario(self.conectivo,
+                               self.left.eliminar_imp(),
+                               self.right.eliminar_imp()
+                              )
+
+    def eliminar_doble_imp(self):
+        if type(self) == Letra:
+            return self
+        elif type(self) == Negacion:
+            return Negacion(self.subf.eliminar_doble_imp())
+        elif type(self) == Binario:
+            if self.conectivo == '=':
+                return Binario('Y',
+                               Binario('O',
+                                   Negacion(self.left.eliminar_doble_imp()),
+                                   self.right.eliminar_doble_imp(),
+                                  ),
+                               Binario('O',
+                                   Negacion(self.right.eliminar_doble_imp()),
+                                   self.left.eliminar_doble_imp(),
+                                  ))
+            else:
+                return Binario(self.conectivo,
+                           self.left.eliminar_doble_imp(),
+                           self.right.eliminar_doble_imp()
+                          )
+
+    def eliminar_doble_negacion(self):
+        if type(self) == Letra:
+            return self
+        elif type(self) == Negacion:
+            if type(self.subf) == Negacion:
+                return deepcopy(self.subf.subf.eliminar_doble_negacion())
+            else:
+                return Negacion(self.subf.eliminar_doble_negacion())
+        elif type(self) == Binario:
+            return Binario(self.conectivo,
+                           self.left.eliminar_doble_negacion(),
+                           self.right.eliminar_doble_negacion())
+
+    def cambiar_de_morgan_y(self):
+        if type(self) == Letra:
+            return self
+        elif type(self) == Negacion:
+            if type(self.subf) == Binario:
+                if self.subf.conectivo == 'Y':
+                    return Binario('O',
+                                   Negacion(self.subf.left.cambiar_de_morgan_y()),
+                                   Negacion(self.subf.right.cambiar_de_morgan_y())
+                                  )
+                else:
+                    return Negacion(self.subf.cambiar_de_morgan_y())
+            else:
+                return Negacion(self.subf.cambiar_de_morgan_y())
+        elif type(self) == Binario:
+            return Binario(self.conectivo,
+                           self.left.cambiar_de_morgan_y(),
+                           self.right.cambiar_de_morgan_y()
+                          )
+
+    def cambiar_de_morgan_o(self):
+        if type(self) == Letra:
+            return self
+        elif type(self) == Negacion:
+            if type(self.subf) == Binario:
+                if self.subf.conectivo == 'O':
+                    return Binario('Y',
+                                   Negacion(self.subf.left.cambiar_de_morgan_o()),
+                                   Negacion(self.subf.right.cambiar_de_morgan_o())
+                                  )
+                else:
+                    return Negacion(self.subf.cambiar_de_morgan_o())
+            else:
+                return Negacion(self.subf.cambiar_de_morgan_o())
+        elif type(self) == Binario:
+            return Binario(self.conectivo,
+                           self.left.cambiar_de_morgan_o(),
+                           self.right.cambiar_de_morgan_o()
+                          )
+
+    def distribuir_o_en_y(self):
+        if type(self) == Letra:
+            return self
+        elif type(self) == Negacion:
+            return Negacion(self.subf.distribuir_o_en_y())
+        elif type(self) == Binario:
+            if self.conectivo == 'O':
+                # print('O')
+                if type(self.right) == Binario:
+                    # print('right binario')
+                    if self.right.conectivo == 'Y': # B O (C Y D)
+                        # print('right Y')
+                        B = self.left.distribuir_o_en_y()
+                        C = self.right.left.distribuir_o_en_y()
+                        D = self.right.right.distribuir_o_en_y()
+                        return Binario('Y',
+                                       Binario('O', B, C),
+                                       Binario('O', B, D)
+                                      )
+                if type(self.left) == Binario:
+                    # print('left binario')
+                    if self.left.conectivo == 'Y': # (B Y C) O D
+                        # print('left Y')
+                        B = self.left.left.distribuir_o_en_y()
+                        C = self.left.right.distribuir_o_en_y()
+                        D = self.right.distribuir_o_en_y()
+                        return Binario('Y',
+                                       Binario('O', B, D),
+                                       Binario('O', C, D)
+                                      )
+        return Binario(self.conectivo,
+                       self.left.distribuir_o_en_y(),
+                       self.right.distribuir_o_en_y()
+                      )
+
+    def fnc(self):
+        A = self.eliminar_doble_imp()
+        A = A.eliminar_imp()
+        A = A.eliminar_doble_negacion()
+        A = A.cambiar_de_morgan_y()
+        A = A.cambiar_de_morgan_o()
+        A = A.eliminar_doble_negacion()
+        aux = A.distribuir_o_en_y()
+        while str(A) != str(aux):
+            A = deepcopy(aux)
+            aux = A.distribuir_o_en_y()
+        return aux
+
 class Letra(Formula) :
     def __init__ (self, letra:str) :
         self.letra = letra
@@ -154,40 +289,23 @@ class Binario(Formula) :
         self.left = left
         self.right = right
 
-
-def inorder_to_tree(cadena:str) -> Formula:
-    if len(cadena) == 0:
-        raise Exception('¡Error: cadena vacía!')
+def inorder_to_tree(cadena:str):
+    conectivos = ['Y', 'O', '>', '=']
     if len(cadena) == 1:
-        assert(cadena not in CONECTIVOS), f"Error: El símbolo de letra proposicional {cadena} no puede ser un conectivo ({CONECTIVOS})."
         return Letra(cadena)
     elif cadena[0] == '-':
-        try:
-            return Negacion(inorder_to_tree(cadena[1:]))
-        except Exception as e:
-            msg_error = f'Cadena incorrecta:\n\t{cadena[1:]}\n'
-            msg_error += f'Error obtenido:\n\t{e}'
-            raise Exception(msg_error)
+        return Negacion(inorder_to_tree(cadena[1:]))
     elif cadena[0] == "(":
-        assert(cadena[-1] == ")"), f'¡Cadena inválida! Falta un paréntesis final en {cadena}'
         counter = 0 #Contador de parentesis
         for i in range(1, len(cadena)):
             if cadena[i] == "(":
                 counter += 1
             elif cadena[i] == ")":
                 counter -=1
-            elif cadena[i] in CONECTIVOS_BINARIOS and counter == 0:
-                try:
-                    return Binario(cadena[i], inorder_to_tree(cadena[1:i]),inorder_to_tree(cadena[i + 1:-1]))
-                except Exception as e:
-                    msg_error = f'{e}\n\n'
-                    msg_error += f'Error en la cadena:\n\t{cadena}'
-                    msg_error += f'\nSe pide procesar el conectivo principal: {cadena[i]}'
-                    msg_error += f'\nRevisar las subfórmulas\t{cadena[1:i]}\n\t{cadena[i + 1:-1]}'
-                    raise Exception(msg_error)
+            elif cadena[i] in conectivos and counter == 0:
+                return Binario(cadena[i], inorder_to_tree(cadena[1:i]),inorder_to_tree(cadena[i + 1:-1]))
     else:
-        raise Exception('¡Cadena inválida! Revise la composición de paréntesis de la fórmula.\nRecuerde que solo los conectivos binarios incluyen paréntesis en la fórmula.')
-
+        raise Exception('¡Cadena inválida!')
 
 class Descriptor :
 
@@ -199,18 +317,18 @@ class Descriptor :
     Output: str de longitud 1
     '''
 
-    def __init__ (self,args_lista,chrInit=256) -> None:
+    def __init__ (self,args_lista,chrInit=256) :
         self.args_lista = args_lista
         assert(len(args_lista) > 0), "Debe haber por lo menos un argumento"
         self.chrInit = chrInit
         self.rango = [chrInit, chrInit + np.prod(self.args_lista)]
 
-    def check_lista_valores(self,lista_valores: List[int]) -> None:
+    def check_lista_valores(self,lista_valores) :
         for i, v in enumerate(lista_valores) :
             assert(v >= 0), "Valores deben ser no negativos"
             assert(v < self.args_lista[i]), f"Valor debe ser menor o igual a {self.args_lista[i]}"
 
-    def codifica(self,lista_valores: List[int]) -> int:
+    def codifica(self,lista_valores) :
         self.check_lista_valores(lista_valores)
         cod = lista_valores[0]
         n_columnas = 1
@@ -219,7 +337,7 @@ class Descriptor :
             cod = n_columnas * lista_valores[i+1] + cod
         return cod
 
-    def decodifica(self,n: int) -> int:
+    def decodifica(self,n) :
         decods = []
         if len(self.args_lista) > 1:
             for i in range(0, len(self.args_lista) - 1) :
@@ -229,46 +347,13 @@ class Descriptor :
         decods.insert(0, n % self.args_lista[0])
         return decods
 
-    def ravel(self,lista_valores: List[int]) -> chr:
+    def P(self,lista_valores) :
         codigo = self.codifica(lista_valores)
         return chr(self.chrInit+codigo)
 
-    def unravel(self,codigo: chr) -> int:
+    def inv(self,codigo) :
         n = ord(codigo)-self.chrInit
         return self.decodifica(n)
-    
-    def escribir(self, literal: chr) -> str:
-        if '-' in literal:
-            atomo = literal[1:]
-            neg = ' no'
-        else:
-            atomo = literal
-            neg = ''
-        x, y, n  = self.unravel(atomo)
-        return f"PREDICADO({x, y, n})"        
-    
-    
-def visualizar_formula(A: Formula, D: Descriptor) -> str:
-    '''
-    Visualiza una fórmula A (como string en notación inorder) usando el descriptor D
-    '''
-    vis = []
-    for c in A:
-        if c == '-':
-            vis.append(' no ')
-        elif c in ['(', ')']:
-            vis.append(c)
-        elif c in ['>', 'Y', 'O']:
-            vis.append(' ' + c + ' ')
-        elif c == '=':
-            vis.append(' sii ')
-        else:
-            try:
-                vis.append(D.escribir(c))
-            except:
-                raise("¡Caracter inválido!")
-    return ''.join(vis)
-
 
 def Ytoria(lista_forms):
     form = ''
@@ -360,7 +445,7 @@ class nodos_tableaux:
             nuevo_nodo.alfas = f_alfas
             nuevo_nodo.betas = f_betas
             nuevo_nodo.literales = f_literales
-            return [nuevo_nodo]
+            return [nuevo_nodo, None]
         elif len(self.betas) > 0:
             f, s, num_regla, cl = f_betas.pop(0)
             if num_regla == 1:
@@ -405,7 +490,7 @@ class nodos_tableaux:
             n2.literales = f_literales2
             return [n1, n2]
         else:
-            return []
+            return [None, None]
 
 def a_clausal(A):
     # Subrutina de Tseitin para encontrar la FNC de
@@ -504,102 +589,3 @@ def tseitin(A):
     B = [[[atomo]]] + [a_clausal(x) for x in L]
     B = [val for sublist in B for val in sublist]
     return B
-
-def complemento(literal: str) -> str:
-	if '-' in literal:
-		return literal[1:]
-	else:
-		return '-' + literal
-    
-def eliminar_literal(S, l):
-    S1 = [c for c in S if l not in c]
-    lc = complemento(l)
-    return [[p for p in c if p != lc] for c in S1]
-
-def extender_I(I, l):
-    I1 = {k:I[k] for k in I if k != l}
-    if '-' in l:
-        I1[l[1:]] = False
-    else:
-        I1[l] = True
-    return I1
-
-def unit_propagate(S, I):
-    '''
-    Algoritmo para eliminar clausulas unitarias de un conjunto de clausulas, manteniendo su satisfacibilidad
-    Input: 
-        - S, conjunto de clausulas
-        - I, interpretacion (diccionario {literal: True/False})
-    Output: 
-        - S, conjunto de clausulas
-        - I, interpretacion (diccionario {literal: True/False})
-    '''
-    while [] not in S:
-        l = ''
-        for x in S:
-            if len(x) == 1:
-                l = x[0]
-                S = eliminar_literal(S, l)
-                I = extender_I(I, l)
-                break
-        if l == '': # Se recorrió todo S y no se encontró unidad
-            break
-    return S, I
-
-from random import choice
-
-def dpll(S, I):
-    '''
-    Algoritmo para verificar la satisfacibilidad de una formula, y encontrar un modelo de la misma
-    Input: 
-        - S, conjunto de clausulas
-        - I, interpretacion (diccionario literal->True/False)
-    Output: 
-        - String, Satisfacible/Insatisfacible
-        - I ,interpretacion (diccionario literal->True/False)
-    '''
-    # Paso 1: Unit Propagation
-    S, I = unit_propagate(S, I)
-
-    # Paso 2: Clausula vacía
-    if [] in S:
-        return "Insatisfacible", I
-    
-    # Paso 3: Conjunto vacío
-    if not S:
-        return "Satisfacible", I
-
-    # Paso 4: Un literal (l) perteneciente a S que no se encuentre asignado en I
-    unassigned_literals = [literal for clause in S for literal in clause if literal not in I and '-' + literal not in I]
-    if unassigned_literals:
-        l = choice(unassigned_literals)
-
-    # Paso 5: S' (S_) como el conjunto de clausulas que contienen a l y eleminando a c(l) de las clausulas restantes
-    S_ = eliminar_literal(S, l)
-
-    # Paso 6: I' (I_) como la interpretación donde V_I'(l) = True
-    I_ = extender_I(I, l)
-
-    # Paso 7: Paso recursivo DPLL para S' e I'
-    result = dpll(S_, I_)
-    if result[0] == "Satisfacible":
-        return result
-    
-    # Paso 8: Si no
-    else:
-        # Paso 9: S'' (S__) como el conjunto de clausulas que contienen a l y eleminando a c(l) de las clausulas restantes
-        S__ = eliminar_literal(S, complemento(l))
-
-        # Paso 10: I'' (I__) como la interpretación donde V_I''(l) = True
-        I__ = extender_I(I, complemento(l))
-
-        # Paso 11: Retornar DPLL para S'' e I''
-        return dpll(S__, I__)
-    
-def SATdpll(formula: str) -> dict:
-    S = tseitin(formula)
-    print("Starting DPLL...")
-    result, interpretation = dpll(S, {})
-
-    print(interpretation)
-    return interpretation if result == "Satisfacible" else result
