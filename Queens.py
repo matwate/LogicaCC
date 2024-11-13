@@ -145,6 +145,7 @@ class Reinas:
         """
         print("Building regla4...")
         n = self.board_size
+<<<<<<< HEAD
         
         regla4 = ""
         for x in range(n):
@@ -160,6 +161,10 @@ class Reinas:
             else:
                 regla4 = f"({regla4}Y{formula})"
 
+=======
+        ReinaEn = self.Reina_En_Casilla
+        regla4 = Ytoria(Otoria(ReinaEn.ravel([i, j]) for j in range(n)) for i in range(n))
+>>>>>>> 94ccd0c (I did some stuff i dont even remember)
         return regla4
     
     def build_all_rules(self) -> str:

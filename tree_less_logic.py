@@ -1,8 +1,8 @@
 from itertools import product
 from time import time
-from Queens import *
 from functools import reduce
 import random
+from Logica import *
 
 
 def timer(func):
@@ -443,9 +443,9 @@ def separate_by_clauses(formula: str, return_rpn: bool = False):
     clauses = [
         clause.replace("(", "").replace(")", "") for clause in formula.split("Y")
     ]
-    if not return_rpn:
-        return clauses
-    return [to_reverse_polish(clause).replace(" ", "") for clause in clauses]
+    if return_rpn:
+        return [to_reverse_polish(clause) for clause in clauses]
+    return clauses
 
 
 def DPLL(clauses: list, model: dict):
@@ -462,23 +462,6 @@ def DPLL(clauses: list, model: dict):
     all_literals = all_literals_of_clauses(S)
     the_choice = random.choice(list(all_literals))
 
-    def remove_literal_from_clause_list(clauses: list, literal: str, model: dict):
-        unit_clause = literal
-        if len(unit_clause) == 1:
-            model[unit_clause] = True
-        else:
-            model[unit_clause[1]] = False
-        for clause in clauses:
-            if unit_clause in clause:
-                clauses.remove(clause)
-            if len(unit_clause) == 1:
-                if f"-{unit_clause}" in clause:
-                    clause = clause.replace(f"-{unit_clause}", "")
-            else:
-                if unit_clause[1] in clause:
-                    clause = clause.replace(unit_clause[1], "")
-        return clauses, model
-
     s_prime, i_prime = remove_literal_from_clause_list(S, the_choice, I)
     result, model = DPLL(s_prime, i_prime)
     if result == "Satisfacible":
@@ -490,6 +473,35 @@ def DPLL(clauses: list, model: dict):
         s_prime, i_prime = remove_literal_from_clause_list(S, negated_choice, I)
         result, model = DPLL(s_prime, i_prime)
         return result, model
+
+
+def remove_literal_from_clause_list(clauses: list, literal: str, model: dict):
+    # Remove clauses with the literal as is.
+    new_clauses = []
+    for clause in clauses:
+        match len(literal):
+            case 1:
+                if literal in clause and f"-{literal}" not in clause:
+                    model[literal] = True
+                    continue
+                if f"-{literal}" in clause:
+                    new_clause = clause.replace(f"-{literal}O", "").replace(
+                        f"O-{literal}", ""
+                    )
+                    new_clauses.append(new_clause)
+                else:
+                    new_clauses.append(clause)
+            case 2:
+                if literal in clause:
+                    model[literal[1]] = False
+                    continue
+                if literal[1] in clause:
+                    new_clause = clause.replace(f"{literal[1]}O", "").replace(
+                        f"O{literal[1]}", ""
+                    )
+                    new_clauses.append(new_clause)
+    print(new_clauses)
+    return new_clauses, model
 
 
 def all_literals_of_clauses(clauses: list):
@@ -512,29 +524,115 @@ def unit_propagate(clauses: list, model: dict):
     def has_unit_clause(clauses: list):
         # A unit clause is either "x" or "-x", a non unitary clause will be AT LEAST "Xoy" so if its 2 or 1 long
         # then its an unit clause
-        return any(len(clause) < 3 and len(clause) >= 1 for clause in clauses)
+        return any(len(clause) in [1, 2] for clause in clauses)
 
-    def get_unit_clause(clauses: list):
-        for clause in clauses:
-            if len(clause) < 3 and len(clause) >= 1:
+    def get_unit_clause(clauses_list: list):
+        for clause in clauses_list:
+            if len(clause) in [1, 2]:
                 return clause
 
     while not has_empty_clause(clauses) and has_unit_clause(clauses):
         unit_clause = get_unit_clause(clauses)
-        if len(unit_clause) == 1:
-            model[unit_clause] = True
-        else:
-            model[unit_clause[1]] = False
-        for clause in clauses:
-            if unit_clause in clause:
-                clauses.remove(clause)
-            if len(unit_clause) == 1:
-                if f"-{unit_clause}" in clause:
-                    clause = clause.replace(f"-{unit_clause}", "")
-            else:
-                if unit_clause[1] in clause:
-                    clause = clause.replace(unit_clause[1], "")
+        clauses, model = remove_literal_from_clause_list(clauses, unit_clause, model)
     return clauses, model
+
+
+def bogo_SAT(formula: str):
+    rpn = to_reverse_polish(formula)
+    letras = letras_proposicionales(formula)
+    n = len(letras)
+    valores = list(product([True, False], repeat=n))
+    random.shuffle(valores)
+    for i in valores:
+        inter = dict(zip(letras, i))
+        if evaluate_rpn(rpn, inter):
+            return inter
+    return None
+
+
+class WalkSat:
+
+    def __init__(self, formula: str, max_flips: int, max_tries: int, temp: float):
+        self.formula = formula
+        self.rpn = to_reverse_polish(formula)
+        self.letras = letras_proposicionales(tseitin_transform(formula))
+        self.n = len(self.letras)
+        self.clause_list = separate_by_clauses(tseitin_transform(self.formula), False)
+        self.clause_list_rpn = separate_by_clauses(
+            tseitin_transform(self.formula, False), True
+        )
+        self.clause_satisfied: list[bool] = []
+        
+        self.max_flips = max_flips
+        self.max_tries = max_tries
+        self.model = {p: random.choice([True, False]) for p in self.letras}
+        self.temp = temp
+        self.literals = all_literals_of_clauses(self.clause_list)
+
+    def try_(self):
+        # This will be a try of the algo
+        # 1. Eval the formula with the model
+        sat = evaluate_rpn(self.rpn, self.model)
+        if sat:
+            return "SAT", self.model
+        for _ in range(self.max_flips):
+            lit = self.least_break_force()
+            will_it_flip = random.randrange(0, 1)
+            if will_it_flip > self.temp:
+                self.model = self.flip_literal(lit, self.model)
+            else:
+                # Pick a random literal
+                self.model = self.flip_literal(
+                    random.choice(list(self.literals)), self.model
+                )
+        return "IDK YET", self.model
+
+    def least_break_force(self):
+        # This function will return the literal that will break the least amount of clauses
+        # 1. Evaluate the clauses with the current model
+        clause_satisfied = [
+            evaluate_rpn(clause, self.model) for clause in self.clause_list_rpn
+        ]
+        # 2. For every literal in the model, check if flipping it will break the least amount of clauses
+        min_break_force = 10**10
+        min_break_literal = None
+        for lit in list(self.literals):
+            temp_model = self.flip_literal(lit, self.model)
+            temp_clause_satisfied = [
+                evaluate_rpn(clause, temp_model) for clause in self.clause_list_rpn
+            ]
+            # Element by element comparison of the clause sat and temp clause sat to check if any true in the first is false in the other
+            break_force = sum(
+                [
+                    1
+                    for i, j in zip(clause_satisfied, temp_clause_satisfied)
+                    if i and not j
+                ]
+            )
+            if break_force < min_break_force:
+                min_break_force = break_force
+                min_break_literal = lit
+        return min_break_literal
+
+    def flip_literal(self, literal: str, model: dict):
+        flipped_model = model
+        let = literal[-1]
+        flipped_model[let] = not model[let]
+        return flipped_model
+
+    def SAT(self):
+        sat = ""
+        for _ in range(self.max_tries):
+            sat = self.try_()
+        return sat
+
+    def SAT_till_SAT(self):
+        sat, inter = self.SAT()
+        walk_sat_attempts = 1
+        while sat != "SAT":
+            walk_sat_attempts += 1
+            sat, inter = self.SAT()
+        return sat, inter
 
 
 """
@@ -548,27 +646,8 @@ def unit_propagate(clauses: list, model: dict):
 
 def main():
     formula = "(AYB)O(CYD)"
-    formula_tseitin = tseitin_transform(formula, return_rpn=False)
-    print(formula)
-    print()
-    print(formula_tseitin)
-    print(
-        f"Unit Propagated:                   {unit_propagate(separate_by_clauses(formula_tseitin), {})}"
-    )
-    print(
-        f"DPLL:                             {DPLL(separate_by_clauses(formula_tseitin), {})}"
-    )
-    print()
-    print("Trying to DPLL the formula but with it in FNC")
-    formula_fnc = to_fnc(formula, return_rpn=False)
-    print(formula_fnc)
-    print()
-    print(
-        f"Unit Propagated:                   {unit_propagate(separate_by_clauses(formula_fnc), {})}"
-    )
-    print(
-        f"DPLL:                             {DPLL(separate_by_clauses(formula_fnc), {})}"
-    )
+    w = WalkSat(formula, 10, 1, 0.5)
+    print(w.SAT())
 
 
 if __name__ == "__main__":
