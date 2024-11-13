@@ -42,7 +42,6 @@ class Reinas:
         regla1 = ""
         for col in range(self.board_size):
             for fila in range(self.board_size):
-                casilla = (col, fila)
                 other = [(col, i) for i in range(self.board_size) if i != fila]
                 formula_1 = ""
                 for otra_casilla in other:
@@ -146,24 +145,22 @@ class Reinas:
         """
         print("Building regla4...")
         n = self.board_size
-        ReinaEn = self.Reina_En_Casilla
-        posiciones = [(x, y) for x in range(n) for y in range(n)]
-        combinaciones = list(combinations(posiciones, n))
-        reglas = []
+        
+        regla4 = ""
+        for x in range(n):
+            formula = ""
+            for y in range(n):
+                if not formula:
+                    formula = self.Reina_En_Casilla.ravel([x, y])
+                else:
+                    formula = f"({formula}O{self.Reina_En_Casilla.ravel([x, y])})"
+            
+            if not regla4:
+                regla4 = formula
+            else:
+                regla4 = f"({regla4}Y{formula})"
 
-        for combinacion in combinaciones:
-            atomos_pos = [ReinaEn.ravel([x, y]) for x, y in combinacion]
-            parte_pos = reduce(lambda x, y: f"({x}Y{y})", atomos_pos)
-            """
-            atomos_neg = [f"-{ReinaEn.ravel(c)}" for c in posiciones if c not in combinacion]
-            parte_neg = reduce(lambda x, y: f"({x}Y{y})", atomos_neg)
-            regla = f"({parte_pos}Y{parte_neg})"
-            reglas.append(regla)
-            """
-            reglas.append(parte_pos)
-
-        print("regla4 built successfully")
-        return reduce(lambda x, y: f"({x}O{y})", reglas)
+        return regla4
     
     def build_all_rules(self) -> str:
         """
