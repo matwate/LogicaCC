@@ -600,6 +600,4 @@ def SATdpll(formula: str) -> dict:
     S = tseitin(formula)
     print("Starting DPLL...")
     result, interpretation = dpll(S, {})
-
-    print(interpretation)
     return interpretation if result == "Satisfacible" else result
