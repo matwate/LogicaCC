@@ -3,6 +3,7 @@ Librería con las clases y funciones
 para lógica proposicional
 '''
 
+from random import *
 from itertools import product
 import numpy as np
 from copy import deepcopy
@@ -601,3 +602,79 @@ def SATdpll(formula: str) -> dict:
     print("Starting DPLL...")
     result, interpretation = dpll(S, {})
     return interpretation if result == "Satisfacible" else result
+
+
+def complemento(l):
+    if '-' in l:
+        return l[1:]
+    else:
+        return '-' + l
+
+def interpretacion_aleatoria(letrasp):
+    I = {p:randint(0,1)==1 for p in letrasp}
+    return I
+
+def flip_literal(I, l):
+    p = l[-1]
+    valor = False if I[p] else True
+    Ip = deepcopy(I)
+    Ip[p] = valor
+    return Ip
+
+
+class WalkSatEstado():
+    
+    def __init__(self, S):
+        self.S = S
+        self.letrasp = list(set([l[-1] for C in self.S for l in C]))
+        self.I = interpretacion_aleatoria(self.letrasp)
+        self.I_lits = set([p for p in self.letrasp if self.I[p]] + ['-'+p for p in self.letrasp if not self.I[p]])
+        self.clausulas_sat = [C for C in self.S if any((True for x in self.I_lits if x in C))]
+        self.clausulas_unsat = [C for C in self.S if C not in self.clausulas_sat]
+
+    def actualizar(self, I):
+        self.I = I
+        self.I_lits = set([p for p in self.letrasp if self.I[p]] + ['-'+p for p in self.letrasp if not self.I[p]])
+        self.clausulas_sat = [C for C in self.S if any((True for x in self.I_lits if x in C))]
+        self.clausulas_unsat = [C for C in self.S if C not in self.clausulas_sat]
+       
+    def SAT(self):
+        return len(self.clausulas_unsat) == 0
+
+    def break_count(self, l):
+        if l in self.I_lits:
+            lit = l
+        else:
+            lit = complemento(l)
+        clausulas_break_count = [C for C in self.clausulas_sat if set(C).intersection(self.I_lits)=={lit}]
+        return len(clausulas_break_count)
+    
+def walkSAT(A, max_flips=10, max_tries=10, p=0.2):
+    w = WalkSatEstado(A)
+    for i in range(max_tries):
+        w.actualizar(interpretacion_aleatoria(w.letrasp))
+        for j in range(max_flips):
+            if w.SAT():
+                return "Satisfacible", w.I
+            C = choice(w.clausulas_unsat)
+            breaks = [(l, w.break_count(l)) for l in C]
+            if any((x[1] == 0 for x in breaks)) > 0:
+                v = choice(breaks)[0]
+            else:
+                if uniform(0, 1) < p:
+                    assert (len(C) > 0), f"{C}"
+                    v = choice(C)
+                else:
+                    min_count = min([x[1] for x in breaks])
+                    mins = [x[0] for x in breaks if x[1] == min_count]
+                    v = choice(mins)
+            I = flip_literal(w.I, v)
+            w.actualizar(I)
+    return None
+
+
+def force_true_walkSAT(A, mf, mt , p):
+    obj = walkSAT(A, mf, mt, p)
+    while obj == None:
+        obj = walkSAT(A, mf, mt, p)
+    return obj

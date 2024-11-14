@@ -7,6 +7,7 @@ from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 import seaborn as sns
 from PIL import Image
 
+
 def escribir_reinas(self, literal):
     if "-" in literal:
         atomo = literal[1:]
@@ -131,11 +132,11 @@ class Reinas:
     def regla4(self):
         """
         Regla 4: Construye una regla para asegurar que haya exactamente una reina en cada fila
-        del tablero. 
+        del tablero.
 
-        Para cada combinación de posiciones de reinas en el tablero, se genera una fórmula 
+        Para cada combinación de posiciones de reinas en el tablero, se genera una fórmula
         lógica que representa la conjunción de que hay una reina en cada una de esas posiciones.
-        Luego, se construye una disyunción de todas estas fórmulas para definir la regla que 
+        Luego, se construye una disyunción de todas estas fórmulas para definir la regla que
         garantiza que haya una reina en cada fila del tablero.
 
         Returns
@@ -145,8 +146,7 @@ class Reinas:
         """
         print("Building regla4...")
         n = self.board_size
-<<<<<<< HEAD
-        
+
         regla4 = ""
         for x in range(n):
             formula = ""
@@ -155,18 +155,14 @@ class Reinas:
                     formula = self.Reina_En_Casilla.ravel([x, y])
                 else:
                     formula = f"({formula}O{self.Reina_En_Casilla.ravel([x, y])})"
-            
+
             if not regla4:
                 regla4 = formula
             else:
                 regla4 = f"({regla4}Y{formula})"
 
-=======
-        ReinaEn = self.Reina_En_Casilla
-        regla4 = Ytoria(Otoria(ReinaEn.ravel([i, j]) for j in range(n)) for i in range(n))
->>>>>>> 94ccd0c (I did some stuff i dont even remember)
         return regla4
-    
+
     def build_all_rules(self) -> str:
         """
         Construye la regla que indica que el tablero de ajedrez debe tener
@@ -179,7 +175,7 @@ class Reinas:
 
         """
         return reduce(lambda x, y: f"({x}Y{y})", self.reglas)
-    
+
     def visualizar(self, I: dict[str, bool]) -> None:
         """
         Visualiza el tablero de ajedrez con las reinas en las posiciones
@@ -188,7 +184,7 @@ class Reinas:
         Parameters
         ----------
         I : dict[str, bool]
-            Diccionario donde las claves son las letras proposicionales del descriptor de las reinas 
+            Diccionario donde las claves son las letras proposicionales del descriptor de las reinas
             y los valores son booleanos que indican si la reina se encuentra
             en esa posición o no.
 
@@ -207,7 +203,9 @@ class Reinas:
             filtered_I = {}
 
             for letter in I:
-                if (ord(letter) >= self.Reina_En_Casilla.rango[0]) and (ord(letter) <= self.Reina_En_Casilla.rango[1]):
+                if (ord(letter) >= self.Reina_En_Casilla.rango[0]) and (
+                    ord(letter) <= self.Reina_En_Casilla.rango[1]
+                ):
                     filtered_I[letter] = I[letter]
 
             # Console print
@@ -215,21 +213,29 @@ class Reinas:
                 if filtered_I[letter]:
                     print(self.Reina_En_Casilla.escribir(letter))
 
-            true_pos = [self.Reina_En_Casilla.unravel(letter) for letter in filtered_I if filtered_I[letter]]
+            true_pos = [
+                self.Reina_En_Casilla.unravel(letter)
+                for letter in filtered_I
+                if filtered_I[letter]
+            ]
             n = self.board_size
 
             # Create a checkerboard pattern for the chessboard
             chessboard = np.indices((n, n)).sum(axis=0) % 2
-            colors = np.where(chessboard == 0, '#D9B58D', '#8B5A2B')  # Light blue and light gray colors
+            colors = np.where(
+                chessboard == 0, "#D9B58D", "#8B5A2B"
+            )  # Light blue and light gray colors
 
             # Set up the figure and axis
             fig, ax = plt.subplots(figsize=(8, 8))
-            
+
             # Draw the chessboard
             for row in range(n):
                 for col in range(n):
                     color = colors[row, col]
-                    rect = plt.Rectangle((col, n - row - 1), 1, 1, facecolor=color, edgecolor='black')
+                    rect = plt.Rectangle(
+                        (col, n - row - 1), 1, 1, facecolor=color, edgecolor="black"
+                    )
                     ax.add_patch(rect)
 
             # Overlay the image on the true positions

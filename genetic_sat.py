@@ -5,8 +5,8 @@ from Queens import *
 from tree_less_logic import *
 import concurrent.futures
 # Constants
-POPULATION_SIZE = 10
-GENERATIONS = 20
+POPULATION_SIZE = 100
+GENERATIONS = 200
 MUTATION_RATE = 0.1
 
 # Parameter ranges
@@ -14,8 +14,7 @@ MAX_TRIES_RANGE = (10, 1000)
 MAX_FLIPS_RANGE = (10, 1000)
 TEMPERATURE_RANGE = (0.01, 1.0)
 # The rule to satisfy
-rule = Reinas(4).r1
-
+rule = "(AYB)O(C>D)"
 def walk_sat(max_tries, max_flips, temperature):
     # Placeholder for the walkSat algorithm
     start_time = time()

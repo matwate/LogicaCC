@@ -562,7 +562,7 @@ class WalkSat:
             tseitin_transform(self.formula, False), True
         )
         self.clause_satisfied: list[bool] = []
-        
+
         self.max_flips = max_flips
         self.max_tries = max_tries
         self.model = {p: random.choice([True, False]) for p in self.letras}
@@ -577,7 +577,7 @@ class WalkSat:
             return "SAT", self.model
         for _ in range(self.max_flips):
             lit = self.least_break_force()
-            will_it_flip = random.randrange(0, 1)
+            will_it_flip = random.uniform(0, 1)
             if will_it_flip > self.temp:
                 self.model = self.flip_literal(lit, self.model)
             else:
@@ -585,6 +585,10 @@ class WalkSat:
                 self.model = self.flip_literal(
                     random.choice(list(self.literals)), self.model
                 )
+            # Evaluate the formula with the new model
+            sat = evaluate_rpn(self.rpn, self.model)
+            if sat:
+                return "SAT", self.model
         return "IDK YET", self.model
 
     def least_break_force(self):
@@ -642,6 +646,31 @@ class WalkSat:
         - Properly remove negations and shit
         - Move to separate function the removal part for reusability
 """
+
+
+def walkSAT(A, max_flips=10, max_tries=10, p=0.2):
+    w = WalkSatEstado(A)
+    for i in range(max_tries):
+        w.actualizar(interpretacion_aleatoria(w.letrasp))
+        for j in range(max_flips):
+            if w.SAT():
+                return "Satisfacible", w.I
+            c = choice(w.clausulas_unsat)
+            breaks = [(l, w.break_count(l)) for l in C]
+            if any((x[1] == 0 for x in breaks)) > 0:
+                v = choice(breaks)[0]
+            else:
+                if uniform(0, 1) < p:
+                    assert (len(C) > 0, f"{C}")
+                    v = choice(C)
+                else:
+                    min_count = min([x[1] for x in breaks])
+                    mins = [x[0] for x in breaks if x[1] == min_count]
+                    v = choice(mins)
+            I = flip_literal(w.I, v)
+            w.actualizar(I)
+    print("Intento Fallido")
+    return None
 
 
 def main():
